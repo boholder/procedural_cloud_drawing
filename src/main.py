@@ -25,7 +25,8 @@ def inner(
 def main() -> int:
     parser = argparse.ArgumentParser(description="Render a procedural sky camera view")
     parser.add_argument(
-        "-d", "--camera-direction",
+        "-d",
+        "--camera-direction",
         nargs=3,
         type=float,
         metavar=("X", "Y", "Z"),

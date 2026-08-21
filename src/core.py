@@ -155,7 +155,7 @@ def composite_clouds(
     return lerp(color, blended, amount[..., None])
 
 
-def equirectangular_directions(
+def camera_view_directions(
     camera_direction: np.ndarray, width: int, height: int
 ) -> np.ndarray:
     """Return world-space perspective rays from the origin through each pixel.
@@ -191,8 +191,8 @@ def render_sky(
 ) -> np.ndarray:
     """Render the HDR RGB view of a camera located at world origin."""
     settings = settings or SkySettings()
-    tex_coord = equirectangular_directions(np_arr(camera_direction), width, height)
-    sky_dir = normalize(tex_coord)
+    sky_dir = camera_view_directions(np_arr(camera_direction), width, height)
+    tex_coord = sky_dir
     sun_dir = normalize(settings.sun_direction)
     moon_dir = -sun_dir
     blend = day_night_blend(sun_dir)

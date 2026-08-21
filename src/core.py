@@ -180,8 +180,8 @@ def render_sky(
     moon_dir = -sun_dir
     blend = day_night_blend(sun_dir)
     color = get_base_sky_and_ground_color(tex_coord, settings, blend)
-    color = composite_moon(color, sky_dir, moon_dir, settings)
-    color += get_sun_color(sky_dir, sun_dir, settings)
+    # color = composite_moon(color, sky_dir, moon_dir, settings)
+    # color += get_sun_color(sky_dir, sun_dir, settings)
     color = composite_clouds(
         color,
         tex_coord,
@@ -193,18 +193,6 @@ def render_sky(
         settings,
         time,
     )
-    # color = composite_clouds(
-    #     color,
-    #     tex_coord,
-    #     sky_dir,
-    #     sun_dir,
-    #     moon_dir,
-    #     blend,
-    #     settings.storm_clouds,
-    #     settings,
-    #     time,
-    #     storm=True,
-    # )
     return color
 
 

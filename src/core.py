@@ -155,26 +155,43 @@ def composite_clouds(
     return lerp(color, blended, amount[..., None])
 
 
-def equirectangular_directions(width: int, height: int) -> np.ndarray:
-    """Pixel-center directions for a full 360x180 degree panorama."""
-    longitude = ((np.arange(width) + 0.5) / width * 2.0 - 1.0) * np.pi
-    latitude = (0.5 - (np.arange(height) + 0.5) / height) * np.pi
-    lon, lat = np.meshgrid(longitude, latitude)
-    cos_lat = np.cos(lat)
-    return np.stack(
-        (cos_lat * np.sin(lon), np.sin(lat), cos_lat * np.cos(lon)), axis=-1
-    )
+def equirectangular_directions(
+    camera_direction: np.ndarray, width: int, height: int
+) -> np.ndarray:
+    """Return world-space perspective rays from the origin through each pixel.
+
+    ``camera_direction`` is the center of the view.  The virtual camera uses
+    world +Y as up and a fixed 90-degree vertical field of view.
+    """
+    if width <= 0 or height <= 0:
+        raise ValueError("width and height must be positive")
+
+    forward = normalize(camera_direction)
+
+    world_up = np.array((0.0, 1.0, 0.0), dtype=np.float32)
+    if abs(float(dot(forward, world_up))) > 0.999:
+        world_up = np.array((0.0, 0.0, 1.0), dtype=np.float32)
+    right = normalize(np.cross(world_up, forward))
+    camera_up = normalize(np.cross(forward, right))
+
+    aspect_ratio = width / height
+    screen_x = ((np.arange(width) + 0.5) / width * 2.0 - 1.0) * aspect_ratio
+    screen_y = 1.0 - (np.arange(height) + 0.5) / height * 2.0
+    x, y = np.meshgrid(screen_x, screen_y)
+    rays = forward + x[..., None] * right + y[..., None] * camera_up
+    return normalize(rays)
 
 
 def render_sky(
+    camera_direction: tuple[float, float, float] = (0.0, 0.0, 1.0),
     width: int = 800,
     height: int = 400,
     time: float = 0.0,
     settings: SkySettings | None = None,
 ) -> np.ndarray:
-    """Render an HDR float RGB panorama, preserving values above one."""
+    """Render the HDR RGB view of a camera located at world origin."""
     settings = settings or SkySettings()
-    tex_coord = equirectangular_directions(width, height)
+    tex_coord = equirectangular_directions(np_arr(camera_direction), width, height)
     sky_dir = normalize(tex_coord)
     sun_dir = normalize(settings.sun_direction)
     moon_dir = -sun_dir

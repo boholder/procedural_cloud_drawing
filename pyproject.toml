@@ -10,6 +10,8 @@ dependencies = [
 
 [project.scripts]
 main = "src.main:main"
+l = "src.main:hd_main"
+h = "src.main:four_k_main"
 
 [build-system]
 requires = ["hatchling"]

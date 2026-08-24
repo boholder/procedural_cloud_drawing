@@ -1,9 +1,9 @@
 """Approximate solar direction for a Unity world/skybox.
 
 Coordinate convention of returned vector:
-    x = North
+    x = East
     y = Up
-    z = East
+    z = North
 
 The returned vector points FROM the world origin / observer TO the visible Sun.
 For the Celestia Flow shader in this project, use the same vector as the
@@ -36,7 +36,7 @@ def sun_direction(
     longitude_deg: float,
     days_in_year: int = 365,
 ) -> float3:
-    """Return a normalized (north, up, east) vector pointing toward the Sun.
+    """Return a normalized (x,y,z)=(east, up, north) vector from world center pointing toward the sun.
 
     `time_of_day_hours` is local *standard* clock time. If using a time zone
     with daylight saving time, pass standard time, or subtract one hour from
@@ -52,13 +52,13 @@ def sun_direction(
         days_in_year,
     )
 
-    # Alt/Az -> Unity world direction: x=North, y=Up, z=East.
+    # Alt/Az -> Unity world direction: y+=Up, z+=North, x+=East, z-=South, x-=West.
     horizontal_length = math.cos(altitude)
     north = horizontal_length * math.cos(azimuth)
     up = math.sin(altitude)
     east = horizontal_length * math.sin(azimuth)
 
-    return north, up, east
+    return east, up, north
 
 
 def _sun_altitude_azimuth_radians(
@@ -78,9 +78,7 @@ def _sun_altitude_azimuth_radians(
     if not -180.0 <= longitude_deg <= 180.0:
         raise ValueError("longitude_deg must be in [-180, 180]")
 
-    gamma = (2.0 * math.pi / days_in_year) * (
-        day_of_year - 1 + (time_of_day_hours - 12.0) / 24.0
-    )
+    gamma = (2.0 * math.pi / days_in_year) * (day_of_year - 1 + (time_of_day_hours - 12.0) / 24.0)
 
     equation_of_time_minutes = 229.18 * (
         0.000075
@@ -103,9 +101,7 @@ def _sun_altitude_azimuth_radians(
     # Local standard clock time -> true solar time.
     clock_minutes = time_of_day_hours * 60.0
     utc_offset_hours = round(longitude_deg / 15.0)
-    time_offset_minutes = (
-        equation_of_time_minutes + 4.0 * longitude_deg - 60.0 * utc_offset_hours
-    )
+    time_offset_minutes = equation_of_time_minutes + 4.0 * longitude_deg - 60.0 * utc_offset_hours
 
     true_solar_time_minutes = (clock_minutes + time_offset_minutes) % 1440.0
 
@@ -115,16 +111,15 @@ def _sun_altitude_azimuth_radians(
 
     # Altitude above the horizon and azimuth clockwise from north:
     # North=0°, East=90°, South=180°, West=270°.
-    sin_altitude = math.sin(latitude) * math.sin(declination) + math.cos(
-        latitude
-    ) * math.cos(declination) * math.cos(hour_angle)
+    sin_altitude = math.sin(latitude) * math.sin(declination) + math.cos(latitude) * math.cos(declination) * math.cos(
+        hour_angle
+    )
     altitude = math.asin(max(-1.0, min(1.0, sin_altitude)))
 
     azimuth = (
         math.atan2(
             math.sin(hour_angle),
-            math.cos(hour_angle) * math.sin(latitude)
-            - math.tan(declination) * math.cos(latitude),
+            math.cos(hour_angle) * math.sin(latitude) - math.tan(declination) * math.cos(latitude),
         )
         + math.pi
     )
@@ -148,21 +143,3 @@ def sun_altitude_azimuth(
         days_in_year,
     )
     return math.degrees(altitude), math.degrees(azimuth)
-
-
-if __name__ == "__main__":
-    # Tokyo: June 21 (ordinary-year day 172), 12:00 JST.
-    sun = sun_direction(
-        day_of_year=172,
-        time_of_day_hours=12.0,
-        latitude_deg=35.6762,
-        longitude_deg=139.6503,
-    )
-    _altitude, _azimuth = sun_altitude_azimuth(
-        day_of_year=172,
-        time_of_day_hours=12.0,
-        latitude_deg=35.6762,
-        longitude_deg=139.6503,
-    )
-    print("sun_direction (north, up, east):", sun)
-    print(f"altitude: {_altitude:.2f}°, azimuth: {_azimuth:.2f}°")

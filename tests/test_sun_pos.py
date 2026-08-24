@@ -25,7 +25,8 @@ def equation_of_time_minutes(day_of_year) -> float:
 
 
 def noon(day_of_year: int, longitude: float) -> float:
-    return ((60 * 12) - (4.0 * longitude) - equation_of_time_minutes(day_of_year)) / 60
+    utc_offset_hours = round(longitude / 15.0)
+    return (720 - equation_of_time_minutes(day_of_year) - 4.0 * longitude + 60.0 * utc_offset_hours) / 60.0
 
 
 def midnight(day_of_year: int, longitude: float) -> float:
@@ -57,6 +58,7 @@ TROPIC = 23 + 26 / 60
 SUB_TROPIC_RAD = math.radians(90 - TROPIC)
 # 43.1334 degrees
 SUB_2_TROPIC_RAD = math.radians(90 - 2 * TROPIC)
+TROPIC_RAD = math.radians(TROPIC)
 
 # Azimuths
 NORTH = 0.0
@@ -68,6 +70,10 @@ WEST = 270.0
 NULL_ISLAND = (0.0, 0.0)
 TROPIC_NORTH = (TROPIC, 0.0)
 TROPIC_SOUTH = (-TROPIC, 0.0)
+EAST_P = (0.0, 90)
+WEST_P = (0.0, -90)
+NORTH_POLE = (90, 0)
+SOUTH_POLE = (-90, 0)
 
 # Altitude Azimuth and Direction pairs
 # same alt-az must be the same direction
@@ -82,6 +88,8 @@ NOON_LOWEST_SOUTH = (
     (90 - 2 * TROPIC, SOUTH),
     (0.0, math.sin(SUB_2_TROPIC_RAD), -math.cos(SUB_2_TROPIC_RAD)),
 )
+NORTH_POLE_SUMMER = ((TROPIC, SOUTH), (0.0, math.sin(TROPIC_RAD), -math.cos(TROPIC_RAD)))
+SOUTH_POLE_SUMMER = ((TROPIC, NORTH), (0.0, math.sin(TROPIC_RAD), math.cos(TROPIC_RAD)))
 MIDNIGHT = reverse_dir(HIGH_NOON)
 MIDNIGHT_SOUTH = reverse_dir(NOON_HIGHEST_NORTH)
 MIDNIGHT_NORTH = reverse_dir(NOON_HIGHEST_SOUTH)
@@ -102,6 +110,10 @@ CASES: list[TestCase] = [
     (DECEMBER_SOLSTICE, noon(DECEMBER_SOLSTICE, 0.0), TROPIC_SOUTH, *HIGH_NOON),
     (SEPTEMBER_EQUINOX, noon(SEPTEMBER_EQUINOX, 0.0), TROPIC_SOUTH, *NOON_HIGHEST_NORTH),
     (JUNE_SOLSTICE, noon(JUNE_SOLSTICE, 0.0), TROPIC_SOUTH, *NOON_LOWEST_NORTH),
+    (MARCH_EQUINOX, noon(MARCH_EQUINOX, EAST_P[1]), EAST_P, *HIGH_NOON),
+    (MARCH_EQUINOX, noon(MARCH_EQUINOX, WEST_P[1]), WEST_P, *HIGH_NOON),
+    (JUNE_SOLSTICE, noon(JUNE_SOLSTICE, NORTH_POLE[1]), NORTH_POLE, *NORTH_POLE_SUMMER),
+    (DECEMBER_SOLSTICE, noon(DECEMBER_SOLSTICE, SOUTH_POLE[1]), SOUTH_POLE, *SOUTH_POLE_SUMMER),
     (MARCH_EQUINOX, midnight(MARCH_EQUINOX, 0.0), NULL_ISLAND, *MIDNIGHT),
     (JUNE_SOLSTICE, midnight(JUNE_SOLSTICE, 0.0), NULL_ISLAND, *MIDNIGHT_NORTH),
     (SEPTEMBER_EQUINOX, midnight(SEPTEMBER_EQUINOX, 0.0), NULL_ISLAND, *MIDNIGHT),

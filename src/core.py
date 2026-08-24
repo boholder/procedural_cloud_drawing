@@ -60,20 +60,14 @@ def day_night_blend(sun_direction: np.ndarray) -> float:
     return float(saturate(sun_direction[1] * 2.0 + 1.0))
 
 
-def get_base_sky_and_ground_color(
-    tex_coord: np.ndarray, settings: SkySettings, blend: float
-) -> np.ndarray:
+def get_base_sky_and_ground_color(tex_coord: np.ndarray, settings: SkySettings, blend: float) -> np.ndarray:
     color = lerp(np_arr(settings.night_color), np_arr(settings.day_sky_color), blend)
     band = saturate(np.cos((tex_coord[..., 1] + settings.ground_offset) * np.pi))
     reflection = band[..., None] ** settings.ground_reflection_falloff
-    return color + reflection * settings.ground_reflection_strength * np_arr(
-        settings.ground_color
-    )
+    return color + reflection * settings.ground_reflection_strength * np_arr(settings.ground_color)
 
 
-def get_sun_color(
-    sky_dir: np.ndarray, sun_dir: np.ndarray, settings: SkySettings
-) -> np.ndarray:
+def get_sun_color(sky_dir: np.ndarray, sun_dir: np.ndarray, settings: SkySettings) -> np.ndarray:
     if not settings.enable_sun:
         return np.zeros_like(sky_dir)
     angle = np.arccos(np.clip(dot(sky_dir, sun_dir), -1.0, 1.0))
@@ -81,9 +75,7 @@ def get_sun_color(
     return np_arr(settings.sun_color) * settings.sun_intensity * disc[..., None]
 
 
-def composite_moon(
-    color: np.ndarray, sky_dir: np.ndarray, moon_dir: np.ndarray, settings: SkySettings
-) -> np.ndarray:
+def composite_moon(color: np.ndarray, sky_dir: np.ndarray, moon_dir: np.ndarray, settings: SkySettings) -> np.ndarray:
     """Analytic moon disc/glow; texture sampling is intentionally omitted."""
     if not settings.enable_moon:
         return color
@@ -91,9 +83,7 @@ def composite_moon(
     disc = (angle <= settings.moon_size).astype(float)
     radial = angle / max(settings.moon_size * 2.0, 1e-12)
     glow = smoothstep(0.7, 0.5, radial) ** 2
-    result = color + np_arr(settings.moon_color) * (
-        0.35 * settings.moon_intensity * glow[..., None]
-    )
+    result = color + np_arr(settings.moon_color) * (0.35 * settings.moon_intensity * glow[..., None])
     moon = np_arr(settings.moon_color) * settings.moon_intensity
     return lerp(result, moon, disc[..., None])
 
@@ -112,9 +102,7 @@ def composite_clouds(
     if not clouds.enabled:
         return color
     # Unity _Time.x is t/20; this deliberately preserves the shader's speed.
-    cloud_uv = rotate_vector_around_axis(
-        tex_coord, time / 20.0 * clouds.speed, (0.1, 0.2, 0.3)
-    )
+    cloud_uv = rotate_vector_around_axis(tex_coord, time / 20.0 * clouds.speed, (0.1, 0.2, 0.3))
     noise = fractal_noise(
         cloud_uv * clouds.scale,
         clouds.noise_frequency,
@@ -136,17 +124,13 @@ def composite_clouds(
     if settings.enable_sun:
         rim = saturate(dot(sky_dir, sun_dir)) ** 8.0
         sun_rim_color = (
-            np_arr(settings.sun_color)
-            * (rim * settings.sun_intensity * settings.sun_cloud_multiplier)[..., None]
+            np_arr(settings.sun_color) * (rim * settings.sun_intensity * settings.sun_cloud_multiplier)[..., None]
         )
         blended += lerp(moon_rim_color, sun_rim_color, blend) * 2.0
     if settings.enable_moon:
         rim = saturate(dot(sky_dir, moon_dir)) ** 32.0
         moon_rim_color = (
-            np_arr(settings.moon_color)
-            * (rim * settings.moon_intensity * settings.moon_cloud_multiplier)[
-                ..., None
-            ]
+            np_arr(settings.moon_color) * (rim * settings.moon_intensity * settings.moon_cloud_multiplier)[..., None]
         )
         blended += lerp(moon_rim_color, sun_rim_color, blend) * 2.0
     lower_sky_rim = 1.0 - saturate(dot(sky_dir, (0.0, -1.0, 0.0)))
@@ -155,9 +139,7 @@ def composite_clouds(
     return lerp(color, blended, amount[..., None])
 
 
-def camera_view_directions(
-    camera_direction: np.ndarray, width: int, height: int
-) -> np.ndarray:
+def camera_view_directions(camera_direction: np.ndarray, width: int, height: int) -> np.ndarray:
     """Return world-space perspective rays from the origin through each pixel.
 
     ``camera_direction`` is the center of the view.  The virtual camera uses

@@ -5,15 +5,11 @@ from numpy.typing import ArrayLike, NDArray
 
 from src.cg_hlsl import frac, lerp, normalize, saturate, dot
 
-NoiseAlgorithm = Literal[
-    "simplex", "opensimplex2s", "perlin", "value", "worley", "curl_domain_warp"
-]
+NoiseAlgorithm = Literal["simplex", "opensimplex2s", "perlin", "value", "worley", "curl_domain_warp"]
 FloatArray = NDArray[np.floating]
 
 
-def rotate_vector_around_axis(
-    p: ArrayLike, angle: float, axis: ArrayLike
-) -> FloatArray:
+def rotate_vector_around_axis(p: ArrayLike, angle: float, axis: ArrayLike) -> FloatArray:
     p = np.asarray(p, float)
     a = normalize(axis)
     c, s = np.cos(angle), np.sin(angle)
@@ -47,12 +43,8 @@ def value3d(p: ArrayLike) -> FloatArray:
     p = np.asarray(p, float)
     i, f = np.floor(p), frac(p)
     w = fade(f)
-    values = [
-        hash31(i + (x, y, z)) for z in range(2) for y in range(2) for x in range(2)
-    ]
-    x00, x10, x01, x11 = (
-        lerp(values[j], values[j + 1], w[..., 0]) for j in (0, 2, 4, 6)
-    )
+    values = [hash31(i + (x, y, z)) for z in range(2) for y in range(2) for x in range(2)]
+    x00, x10, x01, x11 = (lerp(values[j], values[j + 1], w[..., 0]) for j in (0, 2, 4, 6))
     return lerp(lerp(x00, x10, w[..., 1]), lerp(x01, x11, w[..., 1]), w[..., 2])
 
 
@@ -67,9 +59,7 @@ def perlin3d(p: ArrayLike) -> FloatArray:
                 offset = np.array((x, y, z))
                 gradient = normalize(hash33(i + offset) * 2.0 - 1.0)
                 corners.append(np.sum(gradient * (f - offset), axis=-1))
-    x00, x10, x01, x11 = (
-        lerp(corners[j], corners[j + 1], w[..., 0]) for j in (0, 2, 4, 6)
-    )
+    x00, x10, x01, x11 = (lerp(corners[j], corners[j + 1], w[..., 0]) for j in (0, 2, 4, 6))
     result = lerp(lerp(x00, x10, w[..., 1]), lerp(x01, x11, w[..., 1]), w[..., 2])
     return result * 0.5 + 0.5
 
@@ -83,9 +73,7 @@ def worley3d(p: ArrayLike) -> FloatArray:
             for z in range(-1, 2):
                 offset = np.array((x, y, z))
                 difference = offset + hash33(ip + offset) - fp
-                distance_squared = np.minimum(
-                    distance_squared, np.sum(difference**2, axis=-1)
-                )
+                distance_squared = np.minimum(distance_squared, np.sum(difference**2, axis=-1))
     return saturate(1.0 - np.sqrt(distance_squared))
 
 
@@ -128,10 +116,7 @@ def open_simplex2s_approx3d(p: ArrayLike) -> FloatArray:
 
 def perlin_vec3(p: ArrayLike) -> FloatArray:
     p = np.asarray(p, float)
-    return (
-        np.stack((perlin3d(p), perlin3d(p + 17.0), perlin3d(p + 37.0)), axis=-1) * 2.0
-        - 1.0
-    )
+    return np.stack((perlin3d(p), perlin3d(p + 17.0), perlin3d(p + 37.0)), axis=-1) * 2.0 - 1.0
 
 
 def curl(p: ArrayLike) -> FloatArray:
@@ -147,14 +132,10 @@ def curl(p: ArrayLike) -> FloatArray:
 
 def curl_warped_noise(p: ArrayLike, warp_frequency: float) -> FloatArray:
     p = np.asarray(p, float)
-    return simplex_noise3d(
-        p + normalize(curl(p * warp_frequency) + 1e-4) * warp_frequency
-    )
+    return simplex_noise3d(p + normalize(curl(p * warp_frequency) + 1e-4) * warp_frequency)
 
 
-def base_noise(
-    p: ArrayLike, algorithm: NoiseAlgorithm = "simplex", warp_frequency: float = 0.75
-) -> FloatArray:
+def base_noise(p: ArrayLike, algorithm: NoiseAlgorithm = "simplex", warp_frequency: float = 0.75) -> FloatArray:
     functions: dict[str, Callable[[ArrayLike], FloatArray]] = {
         "simplex": simplex_noise3d,
         "opensimplex2s": open_simplex2s_approx3d,

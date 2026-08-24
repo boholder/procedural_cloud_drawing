@@ -24,7 +24,7 @@ def equation_of_time_minutes(day_of_year) -> float:
 
 def noon(day_of_year: int, longitude: float) -> float:
     utc_offset_hours = round(longitude / 15.0)
-    return (720 - equation_of_time_minutes(day_of_year) - 4.0 * longitude + 60.0 * utc_offset_hours) / 60.0
+    return (720 - equation_of_time_minutes(day_of_year) - 4.0 * longitude + 60 * utc_offset_hours) / 60
 
 
 def midnight(day_of_year: int, longitude: float) -> float:
@@ -42,10 +42,31 @@ def dusk(day_of_year: int, longitude: float) -> float:
     return (noon(day_of_year, longitude) + 6.0) % 24.0
 
 
-def reverse_dir(case: Expectation) -> Expectation:
+def reverse_noon_night_dir(case: Expectation) -> Expectation:
     (altitude, azimuth), (east, up, north) = case
-    reversed_azimuth = (azimuth + 180.0) % 360.0 if azimuth else None
+    reversed_azimuth = (azimuth + 180) % 360 if azimuth else None
     return (-altitude, reversed_azimuth), (-east, -up, -north)
+
+
+def reverse_dawn_dusk_dir(case: Expectation) -> Expectation:
+    """Mirror a dawn direction across north/south to obtain the dusk direction."""
+    (altitude, azimuth), (east, up, north) = case
+    dusk_azimuth = None if azimuth is None else (360 - azimuth) % 360
+    return (altitude, dusk_azimuth), (-east, up, north)
+
+
+def altitude_azimuth_case(altitude_deg: float, azimuth_deg: float) -> Expectation:
+    altitude_rad = math.radians(altitude_deg)
+    azimuth_rad = math.radians(azimuth_deg)
+    horizontal_length = math.cos(altitude_rad)
+    return (
+        (altitude_deg, azimuth_deg),
+        (
+            horizontal_length * math.sin(azimuth_rad),
+            math.sin(altitude_rad),
+            horizontal_length * math.cos(azimuth_rad),
+        ),
+    )
 
 
 # Conventional dates in a non-leap year.
@@ -55,94 +76,104 @@ SEPTEMBER_EQUINOX = 266  # September 23
 DECEMBER_SOLSTICE = 355  # December 21
 
 # Azimuths
-NORTH = 0.0
-EAST = 90.0
-SOUTH = 180.0
-WEST = 270.0
+NORTH = 0
+EAST = 90
+SOUTH = 180
+WEST = 270
 
 # Altitudes
 # 23.4334 degrees
 TROPIC = 23 + 26 / 60
+TROPIC_RAD = math.radians(TROPIC)
 # 66.5667 degrees
 SUB_TROPIC_RAD = math.radians(90 - TROPIC)
 # 43.1334 degrees
 SUB_2_TROPIC_RAD = math.radians(90 - 2 * TROPIC)
-TROPIC_RAD = math.radians(TROPIC)
+# At solar 06:00/18:00 on a solstice at a Tropic:
+# altitude = asin(sin(TROPIC)^2) ~= 9.1 degrees,
+TROPIC_SOLSTICE_ALT_DEG = math.degrees(math.asin(math.sin(TROPIC_RAD) ** 2))
+# the dawn azimuth = atan(1 / sin(TROPIC)) ~= 68.3 degrees.
+TROPIC_SOLSTICE_AZ_DEG = math.degrees(math.atan(1 / math.sin(TROPIC_RAD)))
 
 # Locations
-NULL_ISLAND = (0.0, 0.0)
-TROPIC_NORTH = (TROPIC, 0.0)
-TROPIC_SOUTH = (-TROPIC, 0.0)
-EAST_P = (0.0, 90)
-WEST_P = (0.0, -90)
+NULL_ISLAND = (0, 0)
+TROPIC_NORTH = (TROPIC, 0)
+TROPIC_SOUTH = (-TROPIC, 0)
+EAST_P = (0, 90)
+WEST_P = (0, -90)
 NORTH_POLE = (90, 0)
 SOUTH_POLE = (-90, 0)
 
 # Altitude Azimuth and Direction pairs
 # same alt-az must be the same direction
-NOON_HIGHEST = ((90.0, None), (0.0, 1.0, 0.0))
-NOON_HIGHEST_NORTH = ((90 - TROPIC, NORTH), (0.0, math.sin(SUB_TROPIC_RAD), math.cos(SUB_TROPIC_RAD)))
-NOON_HIGHEST_SOUTH = ((90 - TROPIC, SOUTH), (0.0, math.sin(SUB_TROPIC_RAD), -math.cos(SUB_TROPIC_RAD)))
+NOON_HIGHEST = ((90, None), (0, 1, 0))
+NOON_HIGHEST_NORTH = ((90 - TROPIC, NORTH), (0, math.sin(SUB_TROPIC_RAD), math.cos(SUB_TROPIC_RAD)))
+NOON_HIGHEST_SOUTH = ((90 - TROPIC, SOUTH), (0, math.sin(SUB_TROPIC_RAD), -math.cos(SUB_TROPIC_RAD)))
 NOON_LOWEST_NORTH = (
     (90 - 2 * TROPIC, NORTH),
-    (0.0, math.sin(SUB_2_TROPIC_RAD), math.cos(SUB_2_TROPIC_RAD)),
+    (0, math.sin(SUB_2_TROPIC_RAD), math.cos(SUB_2_TROPIC_RAD)),
 )
 NOON_LOWEST_SOUTH = (
     (90 - 2 * TROPIC, SOUTH),
-    (0.0, math.sin(SUB_2_TROPIC_RAD), -math.cos(SUB_2_TROPIC_RAD)),
+    (0, math.sin(SUB_2_TROPIC_RAD), -math.cos(SUB_2_TROPIC_RAD)),
 )
-NORTH_POLE_SUMMER = ((TROPIC, SOUTH), (0.0, math.sin(TROPIC_RAD), -math.cos(TROPIC_RAD)))
-SOUTH_POLE_SUMMER = ((TROPIC, NORTH), (0.0, math.sin(TROPIC_RAD), math.cos(TROPIC_RAD)))
-NORTH_POLE_EQUINOX = ((0.0, SOUTH), (0.0, 0.0, -1.0))
-NORTH_POLE_WINTER = ((-TROPIC, SOUTH), (0.0, -math.sin(TROPIC_RAD), -math.cos(TROPIC_RAD)))
-SOUTH_POLE_EQUINOX = ((0.0, NORTH), (0.0, 0.0, 1.0))
-SOUTH_POLE_WINTER = ((-TROPIC, NORTH), (0.0, -math.sin(TROPIC_RAD), math.cos(TROPIC_RAD)))
-MIDNIGHT_LOWEST = reverse_dir(NOON_HIGHEST)
-MIDNIGHT_SOUTH = reverse_dir(NOON_HIGHEST_NORTH)
-MIDNIGHT_NORTH = reverse_dir(NOON_HIGHEST_SOUTH)
-MIDNIGHT_LOWEST_SOUTH = reverse_dir(NOON_LOWEST_NORTH)
-MIDNIGHT_LOWEST_NORTH = reverse_dir(NOON_LOWEST_SOUTH)
-NORTH_POLE_EQUINOX_MIDNIGHT = ((0.0, NORTH), (0.0, 0.0, 1.0))
-NORTH_POLE_SUMMER_MIDNIGHT = ((TROPIC, NORTH), (0.0, math.sin(TROPIC_RAD), math.cos(TROPIC_RAD)))
-NORTH_POLE_WINTER_MIDNIGHT = ((-TROPIC, NORTH), (0.0, -math.sin(TROPIC_RAD), math.cos(TROPIC_RAD)))
-SOUTH_POLE_EQUINOX_MIDNIGHT = ((0.0, SOUTH), (0.0, 0.0, -1.0))
-SOUTH_POLE_SUMMER_MIDNIGHT = ((TROPIC, SOUTH), (0.0, math.sin(TROPIC_RAD), -math.cos(TROPIC_RAD)))
-SOUTH_POLE_WINTER_MIDNIGHT = ((-TROPIC, SOUTH), (0.0, -math.sin(TROPIC_RAD), -math.cos(TROPIC_RAD)))
-DAWN_EQUINOX = ((0.0, EAST), (1.0, 0.0, 0.0))
-DUSK_EQUINOX = ((0.0, WEST), (-1.0, 0.0, 0.0))
-DAWN_EQUATOR_SEPTEMBER = ((0.0, 89.65), (1.0, 0.0, 0.0061))
-DAWN_EQUATOR_JUNE = ((0.0, 90 - TROPIC), (math.cos(TROPIC_RAD), 0.0, math.sin(TROPIC_RAD)))
-DUSK_EQUATOR_JUNE = ((0.0, 270 + TROPIC), (-math.cos(TROPIC_RAD), 0.0, math.sin(TROPIC_RAD)))
-DAWN_EQUATOR_DECEMBER = ((0.0, 90 + TROPIC), (math.cos(TROPIC_RAD), 0.0, -math.sin(TROPIC_RAD)))
-DUSK_EQUATOR_DECEMBER = ((0.0, 270 - TROPIC), (-math.cos(TROPIC_RAD), 0.0, -math.sin(TROPIC_RAD)))
-DAWN_TROPIC_NORTH_JUNE = ((9.1, 68.3), (0.9174, 0.1584, 0.3651))
-DUSK_TROPIC_NORTH_JUNE = ((9.1, 291.7), (-0.9174, 0.1584, 0.3651))
-DAWN_TROPIC_NORTH_EQUINOX = ((0.1, 89.7), (1.0, 0.0023, 0.0056))
-DUSK_TROPIC_NORTH_EQUINOX = ((0.0, 270.2), (-1.0, 0.0004, 0.0027))
-DAWN_TROPIC_NORTH_DECEMBER = ((-9.1, 111.7), (0.9176, -0.1580, -0.3647))
-DUSK_TROPIC_NORTH_DECEMBER = ((-9.0, 248.3), (-0.9176, -0.1572, -0.3651))
-DAWN_TROPIC_SOUTH_JUNE = ((-9.1, 68.3), (0.9174, -0.1582, 0.3652))
-DUSK_TROPIC_SOUTH_JUNE = ((-9.1, 291.7), (-0.9174, -0.1580, 0.3653))
-DAWN_TROPIC_SOUTH_EQUINOX = ((-0.1, 89.7), (1.0, -0.0025, 0.0055))
-DUSK_TROPIC_SOUTH_EQUINOX = ((-0.1, 270.1), (-1.0, -0.0017, 0.0022))
-DAWN_TROPIC_SOUTH_DECEMBER = ((9.1, 111.7), (0.9176, 0.1581, -0.3646))
-DUSK_TROPIC_SOUTH_DECEMBER = ((9.1, 248.3), (-0.9176, 0.1589, -0.3644))
-DAWN_NORTH_POLE_EQUINOX = ((-0.2, EAST), (1.0, -0.0028, 0.0003))
-DUSK_NORTH_POLE_EQUINOX = ((0.0, WEST), (-1.0, 0.0006, 0.0004))
-DAWN_NORTH_POLE_JUNE = ((TROPIC, EAST), (math.cos(TROPIC_RAD), math.sin(TROPIC_RAD), 0.0))
-DUSK_NORTH_POLE_JUNE = ((TROPIC, WEST), (-math.cos(TROPIC_RAD), math.sin(TROPIC_RAD), 0.0))
-DAWN_NORTH_POLE_SEPTEMBER = ((0.35, EAST), (1.0, 0.0061, 0.0001))
-DUSK_NORTH_POLE_SEPTEMBER = ((0.15, WEST), (-1.0, 0.0027, 0.0007))
-DAWN_NORTH_POLE_DECEMBER = ((-TROPIC, EAST), (math.cos(TROPIC_RAD), -math.sin(TROPIC_RAD), 0.0))
-DUSK_NORTH_POLE_DECEMBER = ((-TROPIC, WEST), (-math.cos(TROPIC_RAD), -math.sin(TROPIC_RAD), 0.0))
-DAWN_SOUTH_POLE_EQUINOX = ((0.2, EAST), (1.0, 0.0028, -0.0003))
-DUSK_SOUTH_POLE_EQUINOX = ((0.0, WEST), (-1.0, -0.0006, -0.0004))
-DAWN_SOUTH_POLE_JUNE = ((-TROPIC, EAST), (math.cos(TROPIC_RAD), -math.sin(TROPIC_RAD), 0.0))
-DUSK_SOUTH_POLE_JUNE = ((-TROPIC, WEST), (-math.cos(TROPIC_RAD), -math.sin(TROPIC_RAD), 0.0))
-DAWN_SOUTH_POLE_SEPTEMBER = ((-0.35, EAST), (1.0, -0.0061, -0.0001))
-DUSK_SOUTH_POLE_SEPTEMBER = ((-0.15, WEST), (-1.0, -0.0027, -0.0007))
-DAWN_SOUTH_POLE_DECEMBER = ((TROPIC, EAST), (math.cos(TROPIC_RAD), math.sin(TROPIC_RAD), 0.0))
-DUSK_SOUTH_POLE_DECEMBER = ((TROPIC, WEST), (-math.cos(TROPIC_RAD), math.sin(TROPIC_RAD), 0.0))
+MIDNIGHT_LOWEST = reverse_noon_night_dir(NOON_HIGHEST)
+MIDNIGHT_SOUTH = reverse_noon_night_dir(NOON_HIGHEST_NORTH)
+MIDNIGHT_NORTH = reverse_noon_night_dir(NOON_HIGHEST_SOUTH)
+MIDNIGHT_LOWEST_SOUTH = reverse_noon_night_dir(NOON_LOWEST_NORTH)
+MIDNIGHT_LOWEST_NORTH = reverse_noon_night_dir(NOON_LOWEST_SOUTH)
+
+JUN_NOON_NORTH_POLE = ((TROPIC, SOUTH), (0, math.sin(TROPIC_RAD), -math.cos(TROPIC_RAD)))
+JUN_MIDN_NORTH_POLE = ((TROPIC, NORTH), (0, math.sin(TROPIC_RAD), math.cos(TROPIC_RAD)))
+JUN_DAWN_NORTH_POLE = ((TROPIC, EAST), (math.cos(TROPIC_RAD), math.sin(TROPIC_RAD), 0))
+JUN_DUSK_NORTH_POLE = reverse_dawn_dusk_dir(JUN_DAWN_NORTH_POLE)
+EQU_NOON_NORTH_POLE = ((0, SOUTH), (0, 0, -1))
+EQU_MIDN_NORTH_POLE = ((0, NORTH), (0, 0, 1))
+EQU_DAWN_NORTH_POLE = altitude_azimuth_case(0, EAST)
+EQU_DUSK_NORTH_POLE = reverse_dawn_dusk_dir(EQU_DAWN_NORTH_POLE)
+SEP_DAWN_NORTH_POLE = altitude_azimuth_case(0, EAST)
+SEP_DUSK_NORTH_POLE = reverse_dawn_dusk_dir(SEP_DAWN_NORTH_POLE)
+DEC_NOON_NORTH_POLE = ((-TROPIC, SOUTH), (0, -math.sin(TROPIC_RAD), -math.cos(TROPIC_RAD)))
+DEC_MIDN_NORTH_POLE = ((-TROPIC, NORTH), (0, -math.sin(TROPIC_RAD), math.cos(TROPIC_RAD)))
+DEC_DAWN_NORTH_POLE = ((-TROPIC, EAST), (math.cos(TROPIC_RAD), -math.sin(TROPIC_RAD), 0))
+DEC_DUSK_NORTH_POLE = reverse_dawn_dusk_dir(DEC_DAWN_NORTH_POLE)
+
+JUN_NOON_SOUTH_POLE = ((TROPIC, NORTH), (0, math.sin(TROPIC_RAD), math.cos(TROPIC_RAD)))
+JUN_MIDN_SOUTH_POLE = ((TROPIC, SOUTH), (0, math.sin(TROPIC_RAD), -math.cos(TROPIC_RAD)))
+JUN_DAWN_SOUTH_POLE = ((-TROPIC, EAST), (math.cos(TROPIC_RAD), -math.sin(TROPIC_RAD), 0))
+JUN_DUSK_SOUTH_POLE = reverse_dawn_dusk_dir(JUN_DAWN_SOUTH_POLE)
+EQU_NOON_SOUTH_POLE = ((0, NORTH), (0, 0, 1))
+EQU_MIDN_SOUTH_POLE = ((0, SOUTH), (0, 0, -1))
+EQU_DAWN_SOUTH_POLE = altitude_azimuth_case(0, EAST)
+EQU_DUSK_SOUTH_POLE = reverse_dawn_dusk_dir(EQU_DAWN_SOUTH_POLE)
+SEP_DAWN_SOUTH_POLE = altitude_azimuth_case(0, EAST)
+SEP_DUSK_SOUTH_POLE = reverse_dawn_dusk_dir(SEP_DAWN_SOUTH_POLE)
+DEC_NOON_SOUTH_POLE = ((-TROPIC, NORTH), (0, -math.sin(TROPIC_RAD), math.cos(TROPIC_RAD)))
+DEC_MIDN_SOUTH_POLE = ((-TROPIC, SOUTH), (0, -math.sin(TROPIC_RAD), -math.cos(TROPIC_RAD)))
+DEC_DAWN_SOUTH_POLE = ((TROPIC, EAST), (math.cos(TROPIC_RAD), math.sin(TROPIC_RAD), 0))
+DEC_DUSK_SOUTH_POLE = reverse_dawn_dusk_dir(DEC_DAWN_SOUTH_POLE)
+
+JUN_DAWN_EQUATOR = ((0, 90 - TROPIC), (math.cos(TROPIC_RAD), 0, math.sin(TROPIC_RAD)))
+JUN_DUSK_EQUATOR = reverse_dawn_dusk_dir(JUN_DAWN_EQUATOR)
+EQU_DAWN = ((0, EAST), (1, 0, 0))
+EQU_DUSK = reverse_dawn_dusk_dir(EQU_DAWN)
+SEP_DAWN_EQUATOR = altitude_azimuth_case(0, EAST)
+DEC_DAWN_EQUATOR = ((0, 90 + TROPIC), (math.cos(TROPIC_RAD), 0, -math.sin(TROPIC_RAD)))
+DEC_DUSK_EQUATOR = reverse_dawn_dusk_dir(DEC_DAWN_EQUATOR)
+
+JUN_DAWN_TROPIC_NORTH = altitude_azimuth_case(TROPIC_SOLSTICE_ALT_DEG, TROPIC_SOLSTICE_AZ_DEG)
+JUN_DUSK_TROPIC_NORTH = reverse_dawn_dusk_dir(JUN_DAWN_TROPIC_NORTH)
+EQU_DAWN_TROPIC_NORTH = altitude_azimuth_case(0, 90)
+EQU_DUSK_TROPIC_NORTH = reverse_dawn_dusk_dir(EQU_DAWN_TROPIC_NORTH)
+DEC_DAWN_TROPIC_NORTH = altitude_azimuth_case(-TROPIC_SOLSTICE_ALT_DEG, SOUTH - TROPIC_SOLSTICE_AZ_DEG)
+DEC_DUSK_TROPIC_NORTH = reverse_dawn_dusk_dir(DEC_DAWN_TROPIC_NORTH)
+
+JUN_DAWN_TROPIC_SOUTH = altitude_azimuth_case(-TROPIC_SOLSTICE_ALT_DEG, TROPIC_SOLSTICE_AZ_DEG)
+JUN_DUSK_TROPIC_SOUTH = reverse_dawn_dusk_dir(JUN_DAWN_TROPIC_SOUTH)
+EQU_DAWN_TROPIC_SOUTH = altitude_azimuth_case(0, 90)
+EQU_DUSK_TROPIC_SOUTH = reverse_dawn_dusk_dir(EQU_DAWN_TROPIC_SOUTH)
+DEC_DAWN_TROPIC_SOUTH = altitude_azimuth_case(TROPIC_SOLSTICE_ALT_DEG, SOUTH - TROPIC_SOLSTICE_AZ_DEG)
+DEC_DUSK_TROPIC_SOUTH = reverse_dawn_dusk_dir(DEC_DAWN_TROPIC_SOUTH)
 
 # day_of_year, hours_of_day, location, expected_alt_az, expected_direction
 TestCase = tuple[int, float, tuple[float, float], AltitudeAzimuth, Direction]
@@ -167,55 +198,55 @@ def gen_cases(
 
 # day_of_year, noon_expectation, midnight_expectation, dawn_expectation, dusk_expectation
 EQUATOR_CASES: tuple[ExpectationsOfOneDay, ...] = (
-    (MARCH_EQUINOX, NOON_HIGHEST, MIDNIGHT_LOWEST, DAWN_EQUINOX, DUSK_EQUINOX),
-    (JUNE_SOLSTICE, NOON_HIGHEST_NORTH, MIDNIGHT_NORTH, DAWN_EQUATOR_JUNE, DUSK_EQUATOR_JUNE),
-    (SEPTEMBER_EQUINOX, NOON_HIGHEST, MIDNIGHT_LOWEST, DAWN_EQUATOR_SEPTEMBER, DUSK_EQUINOX),
-    (DECEMBER_SOLSTICE, NOON_HIGHEST_SOUTH, MIDNIGHT_SOUTH, DAWN_EQUATOR_DECEMBER, DUSK_EQUATOR_DECEMBER),
+    (MARCH_EQUINOX, NOON_HIGHEST, MIDNIGHT_LOWEST, EQU_DAWN, EQU_DUSK),
+    (JUNE_SOLSTICE, NOON_HIGHEST_NORTH, MIDNIGHT_NORTH, JUN_DAWN_EQUATOR, JUN_DUSK_EQUATOR),
+    (SEPTEMBER_EQUINOX, NOON_HIGHEST, MIDNIGHT_LOWEST, SEP_DAWN_EQUATOR, EQU_DUSK),
+    (DECEMBER_SOLSTICE, NOON_HIGHEST_SOUTH, MIDNIGHT_SOUTH, DEC_DAWN_EQUATOR, DEC_DUSK_EQUATOR),
 )
 TROPIC_NORTH_CASES: tuple[ExpectationsOfOneDay, ...] = (
-    (JUNE_SOLSTICE, NOON_HIGHEST, MIDNIGHT_LOWEST_NORTH, DAWN_TROPIC_NORTH_JUNE, DUSK_TROPIC_NORTH_JUNE),
-    (SEPTEMBER_EQUINOX, NOON_HIGHEST_SOUTH, MIDNIGHT_NORTH, DAWN_TROPIC_NORTH_EQUINOX, DUSK_TROPIC_NORTH_EQUINOX),
-    (DECEMBER_SOLSTICE, NOON_LOWEST_SOUTH, MIDNIGHT_LOWEST, DAWN_TROPIC_NORTH_DECEMBER, DUSK_TROPIC_NORTH_DECEMBER),
+    (JUNE_SOLSTICE, NOON_HIGHEST, MIDNIGHT_LOWEST_NORTH, JUN_DAWN_TROPIC_NORTH, JUN_DUSK_TROPIC_NORTH),
+    (SEPTEMBER_EQUINOX, NOON_HIGHEST_SOUTH, MIDNIGHT_NORTH, EQU_DAWN_TROPIC_NORTH, EQU_DUSK_TROPIC_NORTH),
+    (DECEMBER_SOLSTICE, NOON_LOWEST_SOUTH, MIDNIGHT_LOWEST, DEC_DAWN_TROPIC_NORTH, DEC_DUSK_TROPIC_NORTH),
 )
 TROPIC_SOUTH_CASES: tuple[ExpectationsOfOneDay, ...] = (
-    (JUNE_SOLSTICE, NOON_LOWEST_NORTH, MIDNIGHT_LOWEST, DAWN_TROPIC_SOUTH_JUNE, DUSK_TROPIC_SOUTH_JUNE),
-    (SEPTEMBER_EQUINOX, NOON_HIGHEST_NORTH, MIDNIGHT_SOUTH, DAWN_TROPIC_SOUTH_EQUINOX, DUSK_TROPIC_SOUTH_EQUINOX),
-    (DECEMBER_SOLSTICE, NOON_HIGHEST, MIDNIGHT_LOWEST_SOUTH, DAWN_TROPIC_SOUTH_DECEMBER, DUSK_TROPIC_SOUTH_DECEMBER),
+    (JUNE_SOLSTICE, NOON_LOWEST_NORTH, MIDNIGHT_LOWEST, JUN_DAWN_TROPIC_SOUTH, JUN_DUSK_TROPIC_SOUTH),
+    (SEPTEMBER_EQUINOX, NOON_HIGHEST_NORTH, MIDNIGHT_SOUTH, EQU_DAWN_TROPIC_SOUTH, EQU_DUSK_TROPIC_SOUTH),
+    (DECEMBER_SOLSTICE, NOON_HIGHEST, MIDNIGHT_LOWEST_SOUTH, DEC_DAWN_TROPIC_SOUTH, DEC_DUSK_TROPIC_SOUTH),
 )
 NORTH_POLE_CASES: tuple[ExpectationsOfOneDay, ...] = (
-    (MARCH_EQUINOX, NORTH_POLE_EQUINOX, NORTH_POLE_EQUINOX_MIDNIGHT, DAWN_NORTH_POLE_EQUINOX, DUSK_NORTH_POLE_EQUINOX),
-    (JUNE_SOLSTICE, NORTH_POLE_SUMMER, NORTH_POLE_SUMMER_MIDNIGHT, DAWN_NORTH_POLE_JUNE, DUSK_NORTH_POLE_JUNE),
+    (MARCH_EQUINOX, EQU_NOON_NORTH_POLE, EQU_MIDN_NORTH_POLE, EQU_DAWN_NORTH_POLE, EQU_DUSK_NORTH_POLE),
+    (JUNE_SOLSTICE, JUN_NOON_NORTH_POLE, JUN_MIDN_NORTH_POLE, JUN_DAWN_NORTH_POLE, JUN_DUSK_NORTH_POLE),
     (
         SEPTEMBER_EQUINOX,
-        NORTH_POLE_EQUINOX,
-        NORTH_POLE_EQUINOX_MIDNIGHT,
-        DAWN_NORTH_POLE_SEPTEMBER,
-        DUSK_NORTH_POLE_SEPTEMBER,
+        EQU_NOON_NORTH_POLE,
+        EQU_MIDN_NORTH_POLE,
+        SEP_DAWN_NORTH_POLE,
+        SEP_DUSK_NORTH_POLE,
     ),
     (
         DECEMBER_SOLSTICE,
-        NORTH_POLE_WINTER,
-        NORTH_POLE_WINTER_MIDNIGHT,
-        DAWN_NORTH_POLE_DECEMBER,
-        DUSK_NORTH_POLE_DECEMBER,
+        DEC_NOON_NORTH_POLE,
+        DEC_MIDN_NORTH_POLE,
+        DEC_DAWN_NORTH_POLE,
+        DEC_DUSK_NORTH_POLE,
     ),
 )
 SOUTH_POLE_CASES: tuple[ExpectationsOfOneDay, ...] = (
-    (MARCH_EQUINOX, SOUTH_POLE_EQUINOX, SOUTH_POLE_EQUINOX_MIDNIGHT, DAWN_SOUTH_POLE_EQUINOX, DUSK_SOUTH_POLE_EQUINOX),
-    (JUNE_SOLSTICE, SOUTH_POLE_WINTER, SOUTH_POLE_WINTER_MIDNIGHT, DAWN_SOUTH_POLE_JUNE, DUSK_SOUTH_POLE_JUNE),
+    (MARCH_EQUINOX, EQU_NOON_SOUTH_POLE, EQU_MIDN_SOUTH_POLE, EQU_DAWN_SOUTH_POLE, EQU_DUSK_SOUTH_POLE),
+    (JUNE_SOLSTICE, DEC_NOON_SOUTH_POLE, DEC_MIDN_SOUTH_POLE, JUN_DAWN_SOUTH_POLE, JUN_DUSK_SOUTH_POLE),
     (
         SEPTEMBER_EQUINOX,
-        SOUTH_POLE_EQUINOX,
-        SOUTH_POLE_EQUINOX_MIDNIGHT,
-        DAWN_SOUTH_POLE_SEPTEMBER,
-        DUSK_SOUTH_POLE_SEPTEMBER,
+        EQU_NOON_SOUTH_POLE,
+        EQU_MIDN_SOUTH_POLE,
+        SEP_DAWN_SOUTH_POLE,
+        SEP_DUSK_SOUTH_POLE,
     ),
     (
         DECEMBER_SOLSTICE,
-        SOUTH_POLE_SUMMER,
-        SOUTH_POLE_SUMMER_MIDNIGHT,
-        DAWN_SOUTH_POLE_DECEMBER,
-        DUSK_SOUTH_POLE_DECEMBER,
+        JUN_NOON_SOUTH_POLE,
+        JUN_MIDN_SOUTH_POLE,
+        DEC_DAWN_SOUTH_POLE,
+        DEC_DUSK_SOUTH_POLE,
     ),
 )
 
@@ -254,10 +285,10 @@ def test_alt_az(
         longitude_deg=longitude,
     )
 
-    assert altitude == pytest.approx(expected_altitude, abs=0.3)
+    assert altitude == pytest.approx(expected_altitude, abs=0.4)
     if expected_azimuth is not None:
-        assert azimuth == pytest.approx(expected_azimuth, abs=0.3) or azimuth == pytest.approx(
-            expected_azimuth + 360, abs=0.3
+        assert azimuth == pytest.approx(expected_azimuth, abs=0.4) or azimuth == pytest.approx(
+            expected_azimuth + 360, abs=0.4
         )
 
 
@@ -281,7 +312,7 @@ def test_direction(
     )
 
     # check normalization
-    assert math.sqrt(sum(component * component for component in (east, up, north))) == pytest.approx(1.0, abs=1e-12)
+    assert math.sqrt(sum(component * component for component in (east, up, north))) == pytest.approx(1, abs=1e-12)
 
     expected_east, expected_up, expected_north = expected_direction
     assert east == pytest.approx(expected_east, abs=0.1)

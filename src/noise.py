@@ -1,9 +1,10 @@
-from typing import Callable, Literal
+from collections.abc import Callable
+from typing import Literal
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from src.cg_hlsl import frac, lerp, normalize, saturate, dot
+from src.cg_hlsl import dot, frac, lerp, normalize, saturate
 
 NoiseAlgorithm = Literal["simplex", "opensimplex2s", "perlin", "value", "worley", "curl_domain_warp"]
 FloatArray = NDArray[np.floating]
@@ -43,7 +44,7 @@ def value3d(p: ArrayLike) -> FloatArray:
     p = np.asarray(p, float)
     i, f = np.floor(p), frac(p)
     w = fade(f)
-    values = [hash31(i + (x, y, z)) for z in range(2) for y in range(2) for x in range(2)]
+    values = [hash31((*i, x, y, z)) for z in range(2) for y in range(2) for x in range(2)]
     x00, x10, x01, x11 = (lerp(values[j], values[j + 1], w[..., 0]) for j in (0, 2, 4, 6))
     return lerp(lerp(x00, x10, w[..., 1]), lerp(x01, x11, w[..., 1]), w[..., 2])
 
@@ -90,7 +91,7 @@ def simplex_noise3d(p: ArrayLike) -> FloatArray:
     offsets = (np.zeros(3), i1, i2, np.ones(3))
     shifts = (0.0, 1.0 / 6.0, 1.0 / 3.0, 0.5)
     total = np.zeros(p.shape[:-1])
-    for offset, shift in zip(offsets, shifts):
+    for offset, shift in zip(offsets, shifts, strict=False):
         x = x0 - offset + shift
         gradient = normalize(hash33(np.mod(i + offset, 289.0)) * 2.0 - 1.0)
         attenuation = np.maximum(0.5 - np.sum(x * x, axis=-1), 0.0)
@@ -121,9 +122,9 @@ def perlin_vec3(p: ArrayLike) -> FloatArray:
 
 def curl(p: ArrayLike) -> FloatArray:
     p, e = np.asarray(p, float), 0.5773
-    dx = perlin_vec3(p + (e, 0, 0)) - perlin_vec3(p - (e, 0, 0))
-    dy = perlin_vec3(p + (0, e, 0)) - perlin_vec3(p - (0, e, 0))
-    dz = perlin_vec3(p + (0, 0, e)) - perlin_vec3(p - (0, 0, e))
+    dx = perlin_vec3((*p, e, 0, 0)) - perlin_vec3(p - (e, 0, 0))
+    dy = perlin_vec3((*p, 0, e, 0)) - perlin_vec3(p - (0, e, 0))
+    dz = perlin_vec3((*p, 0, 0, e)) - perlin_vec3(p - (0, 0, e))
     return np.stack(
         (dy[..., 2] - dz[..., 1], dz[..., 0] - dx[..., 2], dx[..., 1] - dy[..., 0]),
         axis=-1,

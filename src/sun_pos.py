@@ -24,9 +24,8 @@ refraction, daylight-saving-time rules, and sub-minute astronomical effects.
 from __future__ import annotations
 
 import math
-from typing import Tuple
 
-float3 = Tuple[float, float, float]
+float3 = tuple[float, float, float]
 
 
 def sun_direction(
@@ -67,7 +66,7 @@ def _sun_altitude_azimuth_radians(
     latitude_deg: float,
     longitude_deg: float,
     days_in_year: int = 365,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """Calculate solar altitude and azimuth in radians."""
     if not 1 <= day_of_year <= days_in_year:
         raise ValueError(f"day_of_year must be in 1..{days_in_year}")
@@ -133,7 +132,7 @@ def sun_altitude_azimuth(
     latitude_deg: float,
     longitude_deg: float,
     days_in_year: int = 365,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """Return (altitude_deg, azimuth_deg), with azimuth clockwise from north."""
     altitude, azimuth = _sun_altitude_azimuth_radians(
         day_of_year,

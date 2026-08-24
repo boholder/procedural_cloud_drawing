@@ -1,4 +1,5 @@
 import math
+from typing import Any
 
 import pytest
 
@@ -10,34 +11,40 @@ JUNE_SOLSTICE = 172  # June 21
 SEPTEMBER_EQUINOX = 266  # September 23
 DECEMBER_SOLSTICE = 355  # December 21
 
+NOON = 12.0
+
+# 23.4333...
+TROPIC = 23 + 26 / 60
+TROPIC_ALT = 90 - TROPIC
+TROPIC_RAD = math.radians(TROPIC_ALT)
+
+# Azimuths
+NORTH = 0.0
+EAST = 90.0
+SOUTH = 180.0
+WEST = 270.0
+
+# Locations
+NULL_ISLAND = (0.0, 0.0)
+TROPIC_NORTH = (TROPIC, 0.0)
+TROPIC_SOUTH = (-TROPIC, 0.0)
+
+# Altitude Azimuth and Direction pairs
+# same alt-az must be the same direction
+HIGH_NOON = ((90.0, None), (0.0, 1.0, 0.0))
+HIGHEST_NORTH = ((TROPIC_ALT, NORTH), (0.0, math.sin(TROPIC_RAD), math.cos(TROPIC_RAD)))
+HIGHEST_SOUTH = ((TROPIC_ALT, SOUTH), (0.0, math.sin(TROPIC_RAD), -math.cos(TROPIC_RAD)))
+
 # day_of_year, hours_of_day, location, expected_alt_az, expected_direction
-TestCase = tuple[int, float, tuple[float, float], tuple[float, float | None], tuple[float, float, float]]
+TestCase = tuple[int, float, tuple[float, float], Any]
 
 CASES: list[TestCase] = [
-    (MARCH_EQUINOX, 12.0, (0.0, 0.0), (90.0, None), (0.0, 1.0, 0.0)),
-    (
-        JUNE_SOLSTICE,
-        12.0,
-        (0.0, 0.0),
-        (66.56, 0.0),
-        (
-            0.0,
-            math.sin(math.radians(66.56)),
-            math.cos(math.radians(66.56)),
-        ),
-    ),
-    (SEPTEMBER_EQUINOX, 12.0, (0.0, 0.0), (90.0, None), (0.0, 1.0, 0.0)),
-    (
-        DECEMBER_SOLSTICE,
-        12.0,
-        (0.0, 0.0),
-        (66.56, 180.0),
-        (
-            0.0,
-            math.sin(math.radians(66.56)),
-            -math.cos(math.radians(66.56)),
-        ),
-    ),
+    (MARCH_EQUINOX, NOON, NULL_ISLAND, *HIGH_NOON),
+    (JUNE_SOLSTICE, NOON, NULL_ISLAND, *HIGHEST_NORTH),
+    (SEPTEMBER_EQUINOX, NOON, NULL_ISLAND, *HIGH_NOON),
+    (DECEMBER_SOLSTICE, NOON, NULL_ISLAND, *HIGHEST_SOUTH),
+    (JUNE_SOLSTICE, NOON, TROPIC_NORTH, *HIGH_NOON),
+    (DECEMBER_SOLSTICE, NOON, TROPIC_SOUTH, *HIGH_NOON),
 ]
 
 

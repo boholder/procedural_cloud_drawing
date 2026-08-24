@@ -24,8 +24,19 @@ def equation_of_time_minutes(day_of_year) -> float:
     )
 
 
-def noon(day_of_year: int, longitude_east_deg: float) -> float:
-    return ((60 * 12) - (4.0 * longitude_east_deg) - equation_of_time_minutes(day_of_year)) / 60
+def noon(day_of_year: int, longitude: float) -> float:
+    return ((60 * 12) - (4.0 * longitude) - equation_of_time_minutes(day_of_year)) / 60
+
+
+def midnight(day_of_year: int, longitude: float) -> float:
+    """Return local standard-clock time for solar midnight."""
+    return (noon(day_of_year, longitude) + 12.0) % 24.0
+
+
+def reverse_dir(case: tuple[tuple[float, float | None], tuple[float, float, float]]) -> tuple:
+    (altitude, azimuth), (east, up, north) = case
+    reversed_azimuth = (azimuth + 180.0) % 360.0 if azimuth else None
+    return (-altitude, reversed_azimuth), (-east, -up, -north)
 
 
 def midnight(day_of_year: int, longitude_east_deg: float) -> float:

@@ -28,6 +28,17 @@ def noon(day_of_year: int, longitude_east_deg: float) -> float:
     return ((60 * 12) - (4.0 * longitude_east_deg) - equation_of_time_minutes(day_of_year)) / 60
 
 
+def midnight(day_of_year: int, longitude_east_deg: float) -> float:
+    """Return local standard-clock time for solar midnight."""
+    return (noon(day_of_year, longitude_east_deg) + 12.0) % 24.0
+
+
+def reverse_dir(case: tuple[tuple[float, float | None], tuple[float, float, float]]) -> tuple:
+    (altitude, azimuth), (east, up, north) = case
+    reversed_azimuth = (azimuth + 180.0) % 360.0 if azimuth else None
+    return (-altitude, reversed_azimuth), (-east, -up, -north)
+
+
 # Altitudes
 # 23.4334 degrees
 TROPIC = 23 + 26 / 60
@@ -50,31 +61,46 @@ TROPIC_SOUTH = (-TROPIC, 0.0)
 # Altitude Azimuth and Direction pairs
 # same alt-az must be the same direction
 HIGH_NOON = ((90.0, None), (0.0, 1.0, 0.0))
-HIGHEST_NORTH = ((90 - TROPIC, NORTH), (0.0, math.sin(SUB_TROPIC_RAD), math.cos(SUB_TROPIC_RAD)))
-HIGHEST_SOUTH = ((90 - TROPIC, SOUTH), (0.0, math.sin(SUB_TROPIC_RAD), -math.cos(SUB_TROPIC_RAD)))
-LOWEST_NOON_NORTH = (
+NOON_HIGHEST_NORTH = ((90 - TROPIC, NORTH), (0.0, math.sin(SUB_TROPIC_RAD), math.cos(SUB_TROPIC_RAD)))
+NOON_HIGHEST_SOUTH = ((90 - TROPIC, SOUTH), (0.0, math.sin(SUB_TROPIC_RAD), -math.cos(SUB_TROPIC_RAD)))
+NOON_LOWEST_NORTH = (
     (90 - 2 * TROPIC, NORTH),
     (0.0, math.sin(SUB_2_TROPIC_RAD), math.cos(SUB_2_TROPIC_RAD)),
 )
-LOWEST_NOON_SOUTH = (
+NOON_LOWEST_SOUTH = (
     (90 - 2 * TROPIC, SOUTH),
     (0.0, math.sin(SUB_2_TROPIC_RAD), -math.cos(SUB_2_TROPIC_RAD)),
 )
+MIDNIGHT = reverse_dir(HIGH_NOON)
+MIDNIGHT_SOUTH = reverse_dir(NOON_HIGHEST_NORTH)
+MIDNIGHT_NORTH = reverse_dir(NOON_HIGHEST_SOUTH)
+MIDNIGHT_LOW_SOUTH = reverse_dir(NOON_LOWEST_NORTH)
+MIDNIGHT_LOW_NORTH = reverse_dir(NOON_LOWEST_SOUTH)
 
 # day_of_year, hours_of_day, location, expected_alt_az, expected_direction
 TestCase = tuple[int, float, tuple[float, float], Any]
 
 CASES: list[TestCase] = [
     (MARCH_EQUINOX, noon(MARCH_EQUINOX, 0.0), NULL_ISLAND, *HIGH_NOON),
-    (JUNE_SOLSTICE, noon(JUNE_SOLSTICE, 0.0), NULL_ISLAND, *HIGHEST_NORTH),
+    (JUNE_SOLSTICE, noon(JUNE_SOLSTICE, 0.0), NULL_ISLAND, *NOON_HIGHEST_NORTH),
     (SEPTEMBER_EQUINOX, noon(SEPTEMBER_EQUINOX, 0.0), NULL_ISLAND, *HIGH_NOON),
-    (DECEMBER_SOLSTICE, noon(DECEMBER_SOLSTICE, 0.0), NULL_ISLAND, *HIGHEST_SOUTH),
+    (DECEMBER_SOLSTICE, noon(DECEMBER_SOLSTICE, 0.0), NULL_ISLAND, *NOON_HIGHEST_SOUTH),
     (JUNE_SOLSTICE, noon(JUNE_SOLSTICE, 0.0), TROPIC_NORTH, *HIGH_NOON),
-    (SEPTEMBER_EQUINOX, noon(SEPTEMBER_EQUINOX, 0.0), TROPIC_NORTH, *HIGHEST_SOUTH),
-    (DECEMBER_SOLSTICE, noon(DECEMBER_SOLSTICE, 0.0), TROPIC_NORTH, *LOWEST_NOON_SOUTH),
+    (SEPTEMBER_EQUINOX, noon(SEPTEMBER_EQUINOX, 0.0), TROPIC_NORTH, *NOON_HIGHEST_SOUTH),
+    (DECEMBER_SOLSTICE, noon(DECEMBER_SOLSTICE, 0.0), TROPIC_NORTH, *NOON_LOWEST_SOUTH),
     (DECEMBER_SOLSTICE, noon(DECEMBER_SOLSTICE, 0.0), TROPIC_SOUTH, *HIGH_NOON),
-    (SEPTEMBER_EQUINOX, noon(SEPTEMBER_EQUINOX, 0.0), TROPIC_SOUTH, *HIGHEST_NORTH),
-    (JUNE_SOLSTICE, noon(JUNE_SOLSTICE, 0.0), TROPIC_SOUTH, *LOWEST_NOON_NORTH),
+    (SEPTEMBER_EQUINOX, noon(SEPTEMBER_EQUINOX, 0.0), TROPIC_SOUTH, *NOON_HIGHEST_NORTH),
+    (JUNE_SOLSTICE, noon(JUNE_SOLSTICE, 0.0), TROPIC_SOUTH, *NOON_LOWEST_NORTH),
+    (MARCH_EQUINOX, midnight(MARCH_EQUINOX, 0.0), NULL_ISLAND, *MIDNIGHT),
+    (JUNE_SOLSTICE, midnight(JUNE_SOLSTICE, 0.0), NULL_ISLAND, *MIDNIGHT_NORTH),
+    (SEPTEMBER_EQUINOX, midnight(SEPTEMBER_EQUINOX, 0.0), NULL_ISLAND, *MIDNIGHT),
+    (DECEMBER_SOLSTICE, midnight(DECEMBER_SOLSTICE, 0.0), NULL_ISLAND, *MIDNIGHT_SOUTH),
+    (JUNE_SOLSTICE, midnight(JUNE_SOLSTICE, 0.0), TROPIC_NORTH, *MIDNIGHT_LOW_NORTH),
+    (SEPTEMBER_EQUINOX, midnight(SEPTEMBER_EQUINOX, 0.0), TROPIC_NORTH, *MIDNIGHT_NORTH),
+    (DECEMBER_SOLSTICE, midnight(DECEMBER_SOLSTICE, 0.0), TROPIC_NORTH, *MIDNIGHT),
+    (DECEMBER_SOLSTICE, midnight(DECEMBER_SOLSTICE, 0.0), TROPIC_SOUTH, *MIDNIGHT_LOW_SOUTH),
+    (SEPTEMBER_EQUINOX, midnight(SEPTEMBER_EQUINOX, 0.0), TROPIC_SOUTH, *MIDNIGHT_SOUTH),
+    (JUNE_SOLSTICE, midnight(JUNE_SOLSTICE, 0.0), TROPIC_SOUTH, *MIDNIGHT),
 ]
 
 

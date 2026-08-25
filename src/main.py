@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from src.core import SkySettings, render_sky, save_sky
+from src.core import CloudSettings, SkySettings, render_sky, save_sky
 
 
 def inner(
@@ -15,7 +15,8 @@ def inner(
         camera_direction=camera_direction,
         width=width,
         height=height,
-        settings=SkySettings(),
+        sky_settings=SkySettings(),
+        cloud_settings=CloudSettings(),
     )
     save_sky(output, image)
     print(f"wrote {output}")

@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -37,7 +37,6 @@ class CloudSettings:
 @dataclass
 class SkySettings:
     sky_color: tuple[float, float, float] = (0.53, 0.81, 0.92)
-    cloud_settings: CloudSettings = field(default_factory=CloudSettings)
 
 
 def get_base_sky_color(shape: tuple[int, ...], settings: SkySettings) -> np.ndarray:
@@ -102,17 +101,18 @@ def render_sky(
     width: int = 800,
     height: int = 400,
     time: float = 0.0,
-    settings: SkySettings | None = None,
+    sky_settings: SkySettings | None = None,
+    cloud_settings: CloudSettings | None = None,
 ) -> np.ndarray:
     """Render the HDR RGB view of a camera located at world origin."""
-    settings = settings or SkySettings()
+    sky_settings = sky_settings or SkySettings()
     sky_dir = camera_view_directions(np_arr(camera_direction), width, height)
     tex_coord = sky_dir
-    color = get_base_sky_color(sky_dir.shape[:-1], settings)
+    color = get_base_sky_color(sky_dir.shape[:-1], sky_settings)
     color = composite_clouds(
         color,
         tex_coord,
-        settings.cloud_settings,
+        cloud_settings,
         time,
     )
     return color

@@ -12,8 +12,7 @@ def saturate(x: ArrayLike) -> FloatArray:
 
 
 def frac(x: ArrayLike) -> FloatArray:
-    value = np.asarray(x, dtype=np.float32)
-    return value - np.floor(value)
+    return np.mod(np.asarray(x, dtype=np.float32), 1.0)
 
 
 def lerp(a: ArrayLike, b: ArrayLike, t: ArrayLike) -> FloatArray:
@@ -44,9 +43,7 @@ def smoothstep(edge0: ArrayLike, edge1: ArrayLike, x: ArrayLike) -> FloatArray:
 
 
 def dot(a: ArrayLike, b: ArrayLike) -> FloatArray:
-    a = np.asarray(a, dtype=np.float32)
-    b = np.asarray(b, dtype=np.float32)
-    return np.sum(a * b, axis=-1)
+    return np.dot(np.asarray(a, dtype=np.float32), np.asarray(b, dtype=np.float32))
 
 
 def length(v: ArrayLike) -> FloatArray:

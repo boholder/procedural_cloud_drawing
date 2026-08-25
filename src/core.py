@@ -6,7 +6,6 @@ from PIL import Image
 
 from src.cg_hlsl import (
     dot,
-    lerp,
     normalize,
     saturate,
     smoothstep,
@@ -22,7 +21,6 @@ def np_arr(value: tuple[float, float, float]) -> np.ndarray:
 class CloudSettings:
     enabled: bool = True
     algorithm: NoiseAlgorithm = "simplex"
-    color: tuple[float, float, float] = (0.1, 0.1, 0.15)
     coverage: float = 0.5
     density: float = 1.0
     scale: float = 1.5
@@ -44,13 +42,10 @@ def get_base_sky_color(shape: tuple[int, ...], settings: SkySettings) -> np.ndar
 
 
 def composite_clouds(
-    color: np.ndarray,
     tex_coord: np.ndarray,
     settings: CloudSettings,
     time: float,
 ) -> np.ndarray:
-    if not settings.enabled:
-        return color
     # Unity _Time.x is t/20; this deliberately preserves the shader's speed.
     cloud_uv = rotate_vector_around_axis(tex_coord, time / 20.0 * settings.speed, (0.1, 0.2, 0.3))
     noise = fractal_noise(
@@ -65,10 +60,7 @@ def composite_clouds(
     smooth_range = settings.smoothness * 0.5
     coverage = float(saturate(1.0 - settings.coverage))
     amount = smoothstep(coverage - smooth_range, coverage + smooth_range, contrasted)
-    amount_arr = amount[..., None]
-
-    cloud_color = np.broadcast_to(np_arr(settings.color), color.shape)
-    return lerp(color, cloud_color, amount_arr)
+    return amount[..., None]
 
 
 def camera_view_directions(camera_direction: np.ndarray, width: int, height: int) -> np.ndarray:
@@ -108,14 +100,12 @@ def render_sky(
     sky_settings = sky_settings or SkySettings()
     sky_dir = camera_view_directions(np_arr(camera_direction), width, height)
     tex_coord = sky_dir
-    color = get_base_sky_color(sky_dir.shape[:-1], sky_settings)
-    color = composite_clouds(
-        color,
-        tex_coord,
-        cloud_settings,
-        time,
-    )
-    return color
+    base_color = get_base_sky_color(sky_dir.shape[:-1], sky_settings)
+    mix_color = base_color
+    if cloud_settings.enabled:
+        cloud_color = composite_clouds(tex_coord, cloud_settings, time)
+        mix_color += cloud_color
+    return mix_color
 
 
 def save_sky(path: str | Path, image: np.ndarray) -> None:

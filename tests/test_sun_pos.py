@@ -90,9 +90,12 @@ SUB_TROPIC_RAD = math.radians(90 - TROPIC)
 # 43.1334 degrees
 SUB_2_TROPIC_RAD = math.radians(90 - 2 * TROPIC)
 # At solar 06:00/18:00 on a solstice at a Tropic:
-# altitude = asin(sin(TROPIC)^2) ~= 9.1 degrees,
+# solar-altitude formula: h=arcsin(sinϕsinδ+cosϕcosδcosH)
+# for 06:00/18:00, hour angle H=±90∘, cosH = 0, cosϕcosδcosH = 0
+# Sun's declination equals the observer's latitude: ϕ=δ=TROPIC, sinϕsinδ = sin(TROPIC)^2
+# altitude = asin(sin(TROPIC)^2) ~= 9.1 degrees
 TROPIC_SOLSTICE_ALT_DEG = math.degrees(math.asin(math.sin(TROPIC_RAD) ** 2))
-# the dawn azimuth = atan(1 / sin(TROPIC)) ~= 68.3 degrees.
+# the dawn azimuth = atan(1 / sin(TROPIC)) ~= 68.3 degrees
 TROPIC_SOLSTICE_AZ_DEG = math.degrees(math.atan(1 / math.sin(TROPIC_RAD)))
 
 # Locations

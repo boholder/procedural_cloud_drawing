@@ -36,107 +36,40 @@ class CloudSettings:
 
 @dataclass
 class SkySettings:
-    day_sky_color: tuple[float, float, float] = (0.53, 0.81, 0.92)
-    night_color: tuple[float, float, float] = (0.1, 0.1, 0.2)
-    ground_color: tuple[float, float, float] = (0.6, 0.6, 1.0)
-    ground_offset: float = 0.0
-    ground_reflection_strength: float = 0.2
-    ground_reflection_falloff: float = 10.0
-    sun_direction: tuple[float, float, float] = (0.0, 0.0, 1.0)
-    enable_sun: bool = True
-    sun_color: tuple[float, float, float] = (1.0, 0.95, 0.8)
-    sun_size: float = 0.1
-    sun_intensity: float = 3.0
-    sun_cloud_multiplier: float = 0.1
-    enable_moon: bool = False
-    moon_color: tuple[float, float, float] = (0.7, 0.7, 0.85)
-    moon_size: float = 0.1
-    moon_intensity: float = 2.0
-    moon_cloud_multiplier: float = 0.1
-    background_clouds: CloudSettings = field(default_factory=CloudSettings)
+    sky_color: tuple[float, float, float] = (0.53, 0.81, 0.92)
+    cloud_settings: CloudSettings = field(default_factory=CloudSettings)
 
 
-def day_night_blend(sun_direction: np.ndarray) -> float:
-    return float(saturate(sun_direction[1] * 2.0 + 1.0))
-
-
-def get_base_sky_and_ground_color(tex_coord: np.ndarray, settings: SkySettings, blend: float) -> np.ndarray:
-    color = lerp(np_arr(settings.night_color), np_arr(settings.day_sky_color), blend)
-    band = saturate(np.cos((tex_coord[..., 1] + settings.ground_offset) * np.pi))
-    reflection = band[..., None] ** settings.ground_reflection_falloff
-    return color + reflection * settings.ground_reflection_strength * np_arr(settings.ground_color)
-
-
-def get_sun_color(sky_dir: np.ndarray, sun_dir: np.ndarray, settings: SkySettings) -> np.ndarray:
-    if not settings.enable_sun:
-        return np.zeros_like(sky_dir)
-    angle = np.arccos(np.clip(dot(sky_dir, sun_dir), -1.0, 1.0))
-    disc = smoothstep(settings.sun_size, 0.0, angle)
-    return np_arr(settings.sun_color) * settings.sun_intensity * disc[..., None]
-
-
-def composite_moon(color: np.ndarray, sky_dir: np.ndarray, moon_dir: np.ndarray, settings: SkySettings) -> np.ndarray:
-    """Analytic moon disc/glow; texture sampling is intentionally omitted."""
-    if not settings.enable_moon:
-        return color
-    angle = np.arccos(np.clip(dot(sky_dir, moon_dir), -1.0, 1.0))
-    disc = (angle <= settings.moon_size).astype(float)
-    radial = angle / max(settings.moon_size * 2.0, 1e-12)
-    glow = smoothstep(0.7, 0.5, radial) ** 2
-    result = color + np_arr(settings.moon_color) * (0.35 * settings.moon_intensity * glow[..., None])
-    moon = np_arr(settings.moon_color) * settings.moon_intensity
-    return lerp(result, moon, disc[..., None])
+def get_base_sky_color(shape: tuple[int, ...], settings: SkySettings) -> np.ndarray:
+    return np.broadcast_to(np_arr(settings.sky_color), (*shape, 3)).copy()
 
 
 def composite_clouds(
     color: np.ndarray,
     tex_coord: np.ndarray,
-    sky_dir: np.ndarray,
-    sun_dir: np.ndarray,
-    moon_dir: np.ndarray,
-    blend: float,
-    clouds: CloudSettings,
-    settings: SkySettings,
+    settings: CloudSettings,
     time: float,
 ) -> np.ndarray:
-    if not clouds.enabled:
+    if not settings.enabled:
         return color
     # Unity _Time.x is t/20; this deliberately preserves the shader's speed.
-    cloud_uv = rotate_vector_around_axis(tex_coord, time / 20.0 * clouds.speed, (0.1, 0.2, 0.3))
+    cloud_uv = rotate_vector_around_axis(tex_coord, time / 20.0 * settings.speed, (0.1, 0.2, 0.3))
     noise = fractal_noise(
-        cloud_uv * clouds.scale,
-        clouds.noise_frequency,
-        clouds.noise_amplitude,
-        clouds.octaves,
-        clouds.warp_frequency,
-        clouds.algorithm,
+        cloud_uv * settings.scale,
+        settings.noise_frequency,
+        settings.noise_amplitude,
+        settings.octaves,
+        settings.warp_frequency,
+        settings.algorithm,
     )
-    contrasted = np.power(np.maximum(noise, 0.0), clouds.density)
-    smooth_range = clouds.smoothness * 0.5
-    coverage = float(saturate(1.0 - clouds.coverage))
+    contrasted = np.power(np.maximum(noise, 0.0), settings.density)
+    smooth_range = settings.smoothness * 0.5
+    coverage = float(saturate(1.0 - settings.coverage))
     amount = smoothstep(coverage - smooth_range, coverage + smooth_range, contrasted)
+    amount_arr = amount[..., None]
 
-    cloud_color = np_arr(clouds.color)
-    tint = lerp(cloud_color * 0.05 + (0.025, 0.05, 0.1), cloud_color, blend)
-    blended = np.broadcast_to(tint, color.shape).copy()
-    sun_rim_color = np.zeros_like(color)
-    moon_rim_color = np.zeros_like(color)
-    if settings.enable_sun:
-        rim = saturate(dot(sky_dir, sun_dir)) ** 8.0
-        sun_rim_color = (
-            np_arr(settings.sun_color) * (rim * settings.sun_intensity * settings.sun_cloud_multiplier)[..., None]
-        )
-        blended += lerp(moon_rim_color, sun_rim_color, blend) * 2.0
-    if settings.enable_moon:
-        rim = saturate(dot(sky_dir, moon_dir)) ** 32.0
-        moon_rim_color = (
-            np_arr(settings.moon_color) * (rim * settings.moon_intensity * settings.moon_cloud_multiplier)[..., None]
-        )
-        blended += lerp(moon_rim_color, sun_rim_color, blend) * 2.0
-    lower_sky_rim = 1.0 - saturate(dot(sky_dir, (0.0, -1.0, 0.0)))
-    blended += blended * lower_sky_rim[..., None] ** 2
-
-    return lerp(color, blended, amount[..., None])
+    cloud_color = np.broadcast_to(np_arr(settings.color), color.shape)
+    return lerp(color, cloud_color, amount_arr)
 
 
 def camera_view_directions(camera_direction: np.ndarray, width: int, height: int) -> np.ndarray:
@@ -175,21 +108,11 @@ def render_sky(
     settings = settings or SkySettings()
     sky_dir = camera_view_directions(np_arr(camera_direction), width, height)
     tex_coord = sky_dir
-    sun_dir = normalize(settings.sun_direction)
-    moon_dir = -sun_dir
-    blend = day_night_blend(sun_dir)
-    color = get_base_sky_and_ground_color(tex_coord, settings, blend)
-    # color = composite_moon(color, sky_dir, moon_dir, settings)
-    # color += get_sun_color(sky_dir, sun_dir, settings)
+    color = get_base_sky_color(sky_dir.shape[:-1], settings)
     color = composite_clouds(
         color,
         tex_coord,
-        sky_dir,
-        sun_dir,
-        moon_dir,
-        blend,
-        settings.background_clouds,
-        settings,
+        settings.cloud_settings,
         time,
     )
     return color
